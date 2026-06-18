@@ -46,7 +46,13 @@ const getOverview = async (req, res, next) => {
 
     let currentStreak = 0;
     if (activityDates.rows && activityDates.rows.length > 0) {
-      const dates = activityDates.rows.map(r => r.activity_date);
+      // Normalize dates to YYYY-MM-DD strings (PG returns Date objects, SQLite returns strings)
+      const dates = activityDates.rows.map(r => {
+        const d = r.activity_date;
+        if (d instanceof Date) return d.toISOString().split('T')[0];
+        if (typeof d === 'string') return d.split('T')[0];
+        return String(d);
+      });
       const todayStr = new Date().toISOString().split('T')[0];
       
       const yesterday = new Date();
@@ -70,6 +76,21 @@ const getOverview = async (req, res, next) => {
       }
     }
 
+    // Today's solved count
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+    const todaySolved = await pool.query(
+      `SELECT COUNT(*) as cnt FROM user_dsa_progress
+       WHERE user_id = $1 AND status = 'solved' AND solved_at >= $2`,
+      [userId, todayStart.toISOString()]
+    );
+
+    // Daily goal from user_settings
+    const goalResult = await pool.query(
+      'SELECT daily_goal FROM user_settings WHERE user_id = $1',
+      [userId]
+    );
+
     res.json({
       questions_solved: parseInt(dsaStats.rows[0]?.questions_solved || 0),
       questions_attempted: parseInt(dsaStats.rows[0]?.questions_attempted || 0),
@@ -80,6 +101,8 @@ const getOverview = async (req, res, next) => {
       completed_interviews: parseInt(interviewStats.rows[0]?.completed_interviews || 0),
       avg_interview_score: parseInt(interviewStats.rows[0]?.avg_score || 0),
       current_streak: currentStreak,
+      today_solved: parseInt(todaySolved.rows[0]?.cnt || 0),
+      daily_goal: goalResult.rows.length > 0 ? parseInt(goalResult.rows[0].daily_goal) : 3,
     });
   } catch (error) {
     next(error);

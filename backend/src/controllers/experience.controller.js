@@ -94,7 +94,7 @@ const getCompanies = async (req, res, next) => {
   try {
     const result = await pool.query(
       `SELECT company_name, COUNT(*) as experience_count,
-              group_concat(role) as roles
+              STRING_AGG(role, ',') as roles
        FROM company_experiences
        GROUP BY company_name
        ORDER BY experience_count DESC`

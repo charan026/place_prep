@@ -6,14 +6,20 @@ import LoadingSpinner from '../components/ui/LoadingSpinner';
 import toast from 'react-hot-toast';
 import {
   Search, Filter, ExternalLink, CheckCircle2,
-  Circle, Clock, StickyNote, ChevronDown
+  Circle, Clock, StickyNote, ChevronDown, Star
 } from 'lucide-react';
 
-const TOPICS = ['All', 'Arrays', 'Strings', 'Linked List', 'Trees', 'Dynamic Programming', 'Graphs', 'Stacks & Queues'];
+const TOPICS = [
+  'All', 'Bookmarked',
+  'Arrays', 'Strings', 'Linked List', 'Trees', 'Dynamic Programming', 'Graphs',
+  'Stacks & Queues', 'Binary Search', 'Heap', 'Sliding Window', 'Two Pointers',
+  'Backtracking', 'Tries', 'Greedy', 'Bit Manipulation', 'Math & Geometry', 'Intervals'
+];
 
 const DSATracker = () => {
   const [questions, setQuestions] = useState([]);
   const [progress, setProgress] = useState({});
+  const [bookmarks, setBookmarks] = useState(new Set());
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedTopic, setSelectedTopic] = useState('All');
@@ -27,10 +33,11 @@ const DSATracker = () => {
 
   const fetchData = async () => {
     try {
-      const [questionsRes, progressRes, statsRes] = await Promise.all([
+      const [questionsRes, progressRes, statsRes, bookmarksRes] = await Promise.all([
         api.get('/dsa/questions'),
         api.get('/dsa/progress'),
         api.get('/dsa/progress/stats'),
+        api.get('/dsa/bookmarks'),
       ]);
 
       setQuestions(questionsRes.data);
@@ -41,6 +48,7 @@ const DSATracker = () => {
       setProgress(progressMap);
 
       setStats(statsRes.data);
+      setBookmarks(new Set(bookmarksRes.data));
     } catch (err) {
       toast.error('Failed to load questions');
     } finally {
@@ -60,6 +68,25 @@ const DSATracker = () => {
       toast.success(status === 'solved' ? '🎉 Marked as solved!' : `Status: ${status}`);
     } catch (err) {
       toast.error('Failed to update progress');
+    }
+  };
+
+  const toggleBookmark = async (questionId) => {
+    try {
+      const res = await api.post('/dsa/bookmarks/toggle', { question_id: questionId });
+      setBookmarks(prev => {
+        const next = new Set(prev);
+        if (res.data.bookmarked) {
+          next.add(questionId);
+          toast.success('⭐ Bookmarked!');
+        } else {
+          next.delete(questionId);
+          toast.success('Bookmark removed');
+        }
+        return next;
+      });
+    } catch (err) {
+      toast.error('Failed to toggle bookmark');
     }
   };
 
@@ -85,7 +112,11 @@ const DSATracker = () => {
   };
 
   const filteredQuestions = questions.filter((q) => {
-    if (selectedTopic !== 'All' && q.topic !== selectedTopic) return false;
+    if (selectedTopic === 'Bookmarked') {
+      if (!bookmarks.has(q.id)) return false;
+    } else if (selectedTopic !== 'All' && q.topic !== selectedTopic) {
+      return false;
+    }
     if (selectedDifficulty && q.difficulty !== selectedDifficulty) return false;
     if (searchQuery && !q.title.toLowerCase().includes(searchQuery.toLowerCase())) return false;
     return true;
@@ -125,6 +156,10 @@ const DSATracker = () => {
               <p className="text-lg font-bold text-surface-400">{stats.overall?.total || 0}</p>
               <p className="text-xs text-surface-500">Total</p>
             </div>
+            <div className="glass-card px-4 py-2 text-center">
+              <p className="text-lg font-bold text-amber-300">{bookmarks.size}</p>
+              <p className="text-xs text-surface-500">Bookmarked</p>
+            </div>
           </div>
         )}
       </div>
@@ -134,20 +169,25 @@ const DSATracker = () => {
         {TOPICS.map((topic) => {
           const topicStat = stats?.topic_stats?.find((t) => t.topic === topic);
           const isActive = selectedTopic === topic;
+          const isBookmarked = topic === 'Bookmarked';
           return (
             <button
               key={topic}
               onClick={() => setSelectedTopic(topic)}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
                 isActive
-                  ? 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
+                  ? isBookmarked
+                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                    : 'bg-primary-500/20 text-primary-400 border border-primary-500/30'
                   : 'text-surface-400 hover:text-surface-200 hover:bg-surface-800/50 border border-transparent'
               }`}
             >
+              {isBookmarked && <Star size={14} className={isActive ? 'fill-amber-400' : ''} />}
               {topic}
-              {topic !== 'All' && topicStat && (
-                <span className="ml-2 text-xs opacity-60">{topicStat.solved || 0}/{topicStat.total}</span>
+              {topic !== 'All' && topic !== 'Bookmarked' && topicStat && (
+                <span className="ml-1 text-xs opacity-60">{topicStat.solved || 0}/{topicStat.total}</span>
               )}
+              {isBookmarked && <span className="ml-1 text-xs opacity-60">{bookmarks.size}</span>}
             </button>
           );
         })}
@@ -192,7 +232,7 @@ const DSATracker = () => {
                 <th className="w-28">Difficulty</th>
                 <th className="hidden md:table-cell w-32">Topic</th>
                 <th className="hidden lg:table-cell w-32">Platform</th>
-                <th className="w-24">Actions</th>
+                <th className="w-28">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -246,6 +286,17 @@ const DSATracker = () => {
                         <CheckCircle2 size={16} />
                       </button>
                       <button
+                        onClick={() => toggleBookmark(q.id)}
+                        className={`p-1.5 rounded-lg transition-colors ${
+                          bookmarks.has(q.id)
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'text-surface-600 hover:text-amber-400 hover:bg-amber-500/10'
+                        }`}
+                        title={bookmarks.has(q.id) ? 'Remove bookmark' : 'Bookmark'}
+                      >
+                        <Star size={16} className={bookmarks.has(q.id) ? 'fill-amber-400' : ''} />
+                      </button>
+                      <button
                         onClick={() => setNotesModal({ open: true, questionId: q.id, notes: progress[q.id]?.notes || '' })}
                         className={`p-1.5 rounded-lg transition-colors ${
                           progress[q.id]?.notes
@@ -266,7 +317,7 @@ const DSATracker = () => {
 
         {filteredQuestions.length === 0 && (
           <div className="text-center py-12 text-surface-500">
-            <p>No questions found matching your filters</p>
+            <p>{selectedTopic === 'Bookmarked' ? 'No bookmarked questions yet — star questions to save them for revision!' : 'No questions found matching your filters'}</p>
           </div>
         )}
       </Card>

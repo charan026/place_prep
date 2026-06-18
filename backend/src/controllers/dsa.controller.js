@@ -143,4 +143,46 @@ const getProgressStats = async (req, res, next) => {
   }
 };
 
-module.exports = { getQuestions, getQuestionById, updateProgress, getProgress, getProgressStats };
+const toggleBookmark = async (req, res, next) => {
+  try {
+    const { question_id } = req.body;
+    if (!question_id) {
+      return res.status(400).json({ error: 'question_id is required.' });
+    }
+
+    // Check if already bookmarked
+    const existing = await pool.query(
+      'SELECT id FROM bookmarks WHERE user_id = $1 AND question_id = $2',
+      [req.user.id, question_id]
+    );
+
+    if (existing.rows.length > 0) {
+      // Remove bookmark
+      await pool.query('DELETE FROM bookmarks WHERE user_id = $1 AND question_id = $2', [req.user.id, question_id]);
+      res.json({ bookmarked: false, question_id });
+    } else {
+      // Add bookmark
+      await pool.query(
+        'INSERT INTO bookmarks (user_id, question_id) VALUES ($1, $2)',
+        [req.user.id, question_id]
+      );
+      res.json({ bookmarked: true, question_id });
+    }
+  } catch (error) {
+    next(error);
+  }
+};
+
+const getBookmarks = async (req, res, next) => {
+  try {
+    const result = await pool.query(
+      'SELECT question_id FROM bookmarks WHERE user_id = $1',
+      [req.user.id]
+    );
+    res.json(result.rows.map(r => r.question_id));
+  } catch (error) {
+    next(error);
+  }
+};
+
+module.exports = { getQuestions, getQuestionById, updateProgress, getProgress, getProgressStats, toggleBookmark, getBookmarks };
