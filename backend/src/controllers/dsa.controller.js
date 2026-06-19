@@ -55,13 +55,19 @@ const updateProgress = async (req, res, next) => {
 
     const solvedAt = status === 'solved' ? new Date().toISOString() : null;
 
+    const hasNotes = req.body.notes !== undefined;
+    const notesValue = req.body.notes === '' ? null : (req.body.notes || null);
+
     const result = await pool.query(
       `INSERT INTO user_dsa_progress (user_id, question_id, status, notes, solved_at)
        VALUES ($1, $2, $3, $4, $5)
        ON CONFLICT (user_id, question_id)
-       DO UPDATE SET status = $3, notes = COALESCE($4, notes), solved_at = COALESCE($5, solved_at)
+       DO UPDATE SET 
+         status = $3, 
+         notes = CASE WHEN $6 THEN $4 ELSE user_dsa_progress.notes END, 
+         solved_at = $5
        RETURNING *`,
-      [req.user.id, question_id, status, notes || null, solvedAt]
+      [req.user.id, question_id, status, notesValue, solvedAt, hasNotes]
     );
 
     res.json(result.rows[0]);

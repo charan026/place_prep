@@ -174,7 +174,7 @@ const DSATracker = () => {
             <button
               key={topic}
               onClick={() => setSelectedTopic(topic)}
-              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
+              className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 active-scale flex items-center gap-1.5 ${
                 isActive
                   ? isBookmarked
                     ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
@@ -276,7 +276,7 @@ const DSATracker = () => {
                     <div className="flex gap-1">
                       <button
                         onClick={() => updateStatus(q.id, 'solved')}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-1.5 rounded-lg transition-all duration-200 active-scale ${
                           progress[q.id]?.status === 'solved'
                             ? 'bg-emerald-500/20 text-emerald-400'
                             : 'text-surface-600 hover:text-emerald-400 hover:bg-emerald-500/10'
@@ -287,7 +287,7 @@ const DSATracker = () => {
                       </button>
                       <button
                         onClick={() => toggleBookmark(q.id)}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-1.5 rounded-lg transition-all duration-200 active-scale ${
                           bookmarks.has(q.id)
                             ? 'bg-amber-500/20 text-amber-400'
                             : 'text-surface-600 hover:text-amber-400 hover:bg-amber-500/10'
@@ -298,7 +298,7 @@ const DSATracker = () => {
                       </button>
                       <button
                         onClick={() => setNotesModal({ open: true, questionId: q.id, notes: progress[q.id]?.notes || '' })}
-                        className={`p-1.5 rounded-lg transition-colors ${
+                        className={`p-1.5 rounded-lg transition-all duration-200 active-scale ${
                           progress[q.id]?.notes
                             ? 'bg-primary-500/20 text-primary-400'
                             : 'text-surface-600 hover:text-primary-400 hover:bg-primary-500/10'

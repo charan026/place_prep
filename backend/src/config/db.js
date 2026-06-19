@@ -74,6 +74,7 @@ if (USE_PG) {
           user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           filename VARCHAR(255) NOT NULL,
           file_path TEXT NOT NULL,
+          resume_text TEXT,
           uploaded_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
         );
 
@@ -140,8 +141,14 @@ if (USE_PG) {
           user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           daily_goal INTEGER DEFAULT 3,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-        );
       `);
+
+      // Ensure resume_text column exists for production databases
+      try {
+        await pool.query(`ALTER TABLE resumes ADD COLUMN IF NOT EXISTS resume_text TEXT`);
+      } catch (err) {
+        console.warn('  ⚠️ Failed to ensure resume_text column in PG:', err.message);
+      }
 
       // Seed DSA questions if empty
       const { rows } = await pool.query('SELECT COUNT(*) as cnt FROM dsa_questions');
@@ -272,7 +279,7 @@ if (USE_PG) {
     );
     CREATE TABLE IF NOT EXISTS resumes (
       id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-      filename TEXT NOT NULL, file_path TEXT NOT NULL, uploaded_at TEXT DEFAULT (datetime('now'))
+      filename TEXT NOT NULL, file_path TEXT NOT NULL, resume_text TEXT, uploaded_at TEXT DEFAULT (datetime('now'))
     );
     CREATE TABLE IF NOT EXISTS resume_analyses (
       id INTEGER PRIMARY KEY AUTOINCREMENT, resume_id INTEGER NOT NULL REFERENCES resumes(id) ON DELETE CASCADE,
@@ -311,6 +318,13 @@ if (USE_PG) {
       updated_at TEXT DEFAULT (datetime('now'))
     );
   `);
+
+  // Ensure resume_text column exists for local SQLite database
+  try {
+    db.exec(`ALTER TABLE resumes ADD COLUMN resume_text TEXT;`);
+  } catch (err) {
+    // Ignore error if column already exists
+  }
 
   const count = db.prepare('SELECT COUNT(*) as cnt FROM dsa_questions').get();
   if (count.cnt === 0) {

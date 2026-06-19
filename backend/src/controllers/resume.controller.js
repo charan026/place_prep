@@ -9,10 +9,20 @@ const uploadResume = async (req, res, next) => {
       return res.status(400).json({ error: 'No file uploaded. Please upload a PDF file.' });
     }
 
+    // Extract text from PDF immediately on upload
+    let resumeText = '';
+    try {
+      const dataBuffer = fs.readFileSync(req.file.path);
+      const pdfData = await pdf(dataBuffer);
+      resumeText = pdfData.text;
+    } catch (parseError) {
+      console.error('Failed to extract text from uploaded PDF:', parseError.message);
+    }
+
     const result = await pool.query(
-      `INSERT INTO resumes (user_id, filename, file_path)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [req.user.id, req.file.originalname, req.file.path]
+      `INSERT INTO resumes (user_id, filename, file_path, resume_text)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [req.user.id, req.file.originalname, req.file.path, resumeText || null]
     );
 
     res.status(201).json(result.rows[0]);
@@ -54,10 +64,27 @@ const analyzeResume = async (req, res, next) => {
 
     const resume = resumeResult.rows[0];
 
-    // Extract text from PDF
-    const dataBuffer = fs.readFileSync(resume.file_path);
-    const pdfData = await pdf(dataBuffer);
-    const resumeText = pdfData.text;
+    // Use extracted text from DB, or fallback to file reading
+    let resumeText = resume.resume_text;
+
+    if (!resumeText || resumeText.trim().length < 50) {
+      if (fs.existsSync(resume.file_path)) {
+        try {
+          const dataBuffer = fs.readFileSync(resume.file_path);
+          const pdfData = await pdf(dataBuffer);
+          resumeText = pdfData.text;
+          
+          // Save extracted text to DB for future calls
+          if (resumeText && resumeText.trim().length >= 50) {
+            await pool.query('UPDATE resumes SET resume_text = $1 WHERE id = $2', [resumeText, id]);
+          }
+        } catch (parseError) {
+          return res.status(400).json({ error: 'Could not extract text from the PDF file on disk.' });
+        }
+      } else {
+        return res.status(400).json({ error: 'Resume text is not available and the PDF file is no longer on the server. Please re-upload your resume.' });
+      }
+    }
 
     if (!resumeText || resumeText.trim().length < 50) {
       return res.status(400).json({ error: 'Could not extract sufficient text from the PDF. Please upload a text-based PDF.' });
