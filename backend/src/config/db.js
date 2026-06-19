@@ -141,6 +141,7 @@ if (USE_PG) {
           user_id INTEGER UNIQUE NOT NULL REFERENCES users(id) ON DELETE CASCADE,
           daily_goal INTEGER DEFAULT 3,
           updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
       `);
 
       // Ensure resume_text column exists for production databases
